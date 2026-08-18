@@ -25,28 +25,12 @@ import httpx
 
 
 def get_gitlab_token() -> str | None:
-    """Get GitLab token from environment or .bashrc.
+    """Get GitLab token from the environment.
 
     Returns:
-        Token string if found in environment or ~/.bashrc, None otherwise.
+        Token string if GITLAB_TOKEN is set, None otherwise.
     """
-    # Check environment first
-    token = os.environ.get("GITLAB_TOKEN")
-    if token:
-        return token
-
-    # Try reading from .bashrc
-    bashrc_path = Path.home() / ".bashrc"
-    if bashrc_path.exists():
-        try:
-            with Path(bashrc_path).open(encoding="utf-8") as f:
-                for line in f:
-                    if line.startswith("export GITLAB_TOKEN="):
-                        return line.split("=", 1)[1].strip().strip('"').strip("'")
-        except OSError as e:
-            print(f"Warning: Could not read .bashrc: {e}", file=sys.stderr)
-
-    return None
+    return os.environ.get("GITLAB_TOKEN")
 
 
 def validate_markdown(
@@ -131,8 +115,8 @@ Examples:
     parser.add_argument(
         "--gitlab-url",
         type=str,
-        default="https://gitlab.example.com",
-        help="GitLab instance URL (default: https://gitlab.example.com)",
+        default="https://gitlab.service.konvergence.it",
+        help="GitLab instance URL (default: https://gitlab.service.konvergence.it)",
     )
 
     parser.add_argument(
@@ -144,7 +128,7 @@ Examples:
     # Get GitLab token
     token = get_gitlab_token()
     if not token:
-        print("Error: GITLAB_TOKEN not found in environment or ~/.bashrc", file=sys.stderr)
+        print("Error: GITLAB_TOKEN not set in environment", file=sys.stderr)
         print("Set it with: export GITLAB_TOKEN='your-token'", file=sys.stderr)
         sys.exit(1)
 
