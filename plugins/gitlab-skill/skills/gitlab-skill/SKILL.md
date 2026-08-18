@@ -8,7 +8,7 @@ metadata:
 
 ## Current GitLab Context
 
-!`$HOME/.claude/skills/gitlab-skill/scripts/gitlab_context.py`
+!`${CLAUDE_PLUGIN_ROOT}/skills/gitlab-skill/scripts/gitlab_context.py`
 
 ## Identity
 
