@@ -58,7 +58,16 @@ def _parse_git_origin() -> tuple[str, str]:
     Raises:
         ValueError: If the origin URL cannot be parsed.
     """
-    repo = _get_repo()
+    try:
+        repo = _get_repo()
+    except git.exc.GitError as exc:
+        msg = f"Not a git repository: {Path.cwd()}"
+        raise ValueError(msg) from exc
+
+    if "origin" not in [remote.name for remote in repo.remotes]:
+        msg = "No 'origin' remote configured in this repository."
+        raise ValueError(msg)
+
     url: str = repo.remotes.origin.url
     if match := re.search(r"(?:@|://(?:[^@]+@)?)([^:/]+)[:/](.+?)(?:\.git)?$", url):
         return match.group(1), match.group(2)
@@ -107,6 +116,23 @@ def _resolve_token() -> str | None:
     return os.environ.get("GITLAB_TOKEN") or os.environ.get("GITLAB_PRIVATE_TOKEN") or None
 
 
+# Hosts that are definitely not GitLab instances. Sending a GitLab PAT to one
+# of these would leak the credential to a third party, so refuse instead.
+_NON_GITLAB_HOSTS = frozenset({
+    "github.com",
+    "www.github.com",
+    "ssh.github.com",
+    "bitbucket.org",
+    "altssh.bitbucket.org",
+    "dev.azure.com",
+    "ssh.dev.azure.com",
+    "vs-ssh.visualstudio.com",
+    "codeberg.org",
+    "gitea.com",
+    "git.sr.ht",
+})
+
+
 def get_gitlab_client() -> gitlab_module.Gitlab:
     """Get authenticated GitLab client.
 
@@ -121,7 +147,12 @@ def get_gitlab_client() -> gitlab_module.Gitlab:
         msg = "No GitLab token found. Set GITLAB_TOKEN env var."
         raise RuntimeError(msg)
 
-    return gitlab_module.Gitlab(f"https://{get_gitlab_host()}", private_token=token)
+    host = get_gitlab_host()
+    if host.lower() in _NON_GITLAB_HOSTS:
+        msg = f"Origin host '{host}' is not a GitLab instance -- refusing to send the GitLab token to it."
+        raise RuntimeError(msg)
+
+    return gitlab_module.Gitlab(f"https://{host}", private_token=token)
 
 
 def _get_project(gl: gitlab_module.Gitlab) -> Project:
@@ -251,7 +282,7 @@ def main() -> None:
     try:
         gl = get_gitlab_client()
         project = _get_project(gl)
-    except (RuntimeError, gitlab_module.GitlabError) as exc:
+    except (RuntimeError, gitlab_module.GitlabError, git.exc.GitError, ValueError, AttributeError, TypeError) as exc:
         print(f"**Pipeline status:** {exc}")
         return
 
@@ -291,6 +322,6 @@ if __name__ == "__main__":
         pass
     except KeyboardInterrupt:
         sys.exit(0)
-    except (RuntimeError, gitlab_module.GitlabError, OSError) as exc:
+    except Exception as exc:  # ruff: ignore[blind-except] - must never break skill loading
         print(f"**Pipeline status:** {exc}")
         sys.exit(0)
