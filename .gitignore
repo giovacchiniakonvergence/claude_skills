@@ -90,3 +90,7 @@ plan/
 
 # Hermes
 .hermes/plans/
+
+# JetBrains IDES
+.idea
+
